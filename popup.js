@@ -1,7 +1,17 @@
+// ================================
+// CONFIG
+// ================================
+const API_BASE = "https://jobai-production-cf74.up.railway.app";
+
+// ================================
+// STATE
+// ================================
 let jobData = null;
 let resumeData = null;
 
-/* UI Elements */
+// ================================
+// UI ELEMENTS
+// ================================
 const analyzeBtn = document.getElementById("analyzeBtn");
 const matchBtn = document.getElementById("matchBtn");
 
@@ -18,61 +28,62 @@ const matchResult = document.getElementById("matchResult");
 const confidenceSection = document.getElementById("confidenceSection");
 const confidenceFill = document.getElementById("confidenceFill");
 
-
-// -----------------------------
+// ================================
 // STEP 1: ANALYZE JOB
-// -----------------------------
+// ================================
 analyzeBtn.addEventListener("click", async () => {
-
   analyzeBtn.textContent = "Analyzing...";
   analyzeBtn.disabled = true;
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
   chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TEXT" }, async (response) => {
-
     if (!response?.pageText) {
       alert("Unable to read job description.");
-      analyzeBtn.textContent = "Analyze This Job";
-      analyzeBtn.disabled = false;
+      resetAnalyzeBtn();
       return;
     }
 
     try {
-      const apiRes = await fetch("http://127.0.0.1:8000/analyze-job", {
+      const apiRes = await fetch(`${API_BASE}/analyze-job`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ page_text: response.pageText })
       });
 
+      if (!apiRes.ok) throw new Error("API error");
+
       jobData = await apiRes.json();
 
-      // Switch UI state
+      // UI Switch
       homeScreen.style.display = "none";
       resultScreen.style.display = "block";
 
-      // Populate job info
-      jobRole.textContent = jobData.role;
-      jobExperience.textContent = `Experience: ${jobData.experience}`;
-      jobSkills.innerHTML = jobData.required_skills
+      // Populate Job Info
+      jobRole.textContent = jobData.role || "Unknown Role";
+      jobExperience.textContent = `Experience: ${jobData.experience || "N/A"}`;
+
+      jobSkills.innerHTML = (jobData.required_skills || [])
         .map(skill => `<li>${skill}</li>`)
         .join("");
 
     } catch (err) {
-      alert("Failed to analyze job.");
+      alert("Failed to analyze job. Please try again.");
     }
 
-    analyzeBtn.textContent = "Analyze This Job";
-    analyzeBtn.disabled = false;
+    resetAnalyzeBtn();
   });
 });
 
+function resetAnalyzeBtn() {
+  analyzeBtn.textContent = "Analyze This Job";
+  analyzeBtn.disabled = false;
+}
 
-// -----------------------------
+// ================================
 // STEP 2: MATCH RESUME
-// -----------------------------
+// ================================
 matchBtn.addEventListener("click", async () => {
-
   matchResult.innerHTML = "<p>Matching resume...</p>";
 
   if (!jobData) {
@@ -87,19 +98,21 @@ matchBtn.addEventListener("click", async () => {
   }
 
   try {
-    // ---- Upload Resume ----
+    // ---- Parse Resume ----
     const formData = new FormData();
     formData.append("file", file);
 
-    const resumeRes = await fetch("http://127.0.0.1:8000/parse-resume", {
+    const resumeRes = await fetch(`${API_BASE}/parse-resume`, {
       method: "POST",
       body: formData
     });
 
+    if (!resumeRes.ok) throw new Error("Resume parse failed");
+
     resumeData = await resumeRes.json();
 
-    // ---- Match ----
-    const matchRes = await fetch("http://127.0.0.1:8000/match", {
+    // ---- Match Resume ↔ Job ----
+    const matchRes = await fetch(`${API_BASE}/match`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -108,10 +121,12 @@ matchBtn.addEventListener("click", async () => {
       })
     });
 
+    if (!matchRes.ok) throw new Error("Match failed");
+
     const matchData = await matchRes.json();
 
-    // ---- Explain ----
-    const explainRes = await fetch("http://127.0.0.1:8000/explain", {
+    // ---- Explain Match ----
+    const explainRes = await fetch(`${API_BASE}/explain`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -121,32 +136,36 @@ matchBtn.addEventListener("click", async () => {
       })
     });
 
+    if (!explainRes.ok) throw new Error("Explain failed");
+
     const explainData = await explainRes.json();
 
-    // -----------------------------
+    // ================================
     // CONFIDENCE BAR
-    // -----------------------------
+    // ================================
+    const percentage = matchData.match_percentage || 0;
+
     confidenceSection.style.display = "block";
     confidenceFill.style.width = "0%";
     confidenceFill.textContent = "0%";
 
     setTimeout(() => {
-      confidenceFill.style.width = `${matchData.match_percentage}%`;
-      confidenceFill.textContent = `${matchData.match_percentage}%`;
+      confidenceFill.style.width = `${percentage}%`;
+      confidenceFill.textContent = `${percentage}%`;
     }, 150);
 
-    // -----------------------------
-    // MATCH RESULT UI
-    // -----------------------------
+    // ================================
+    // RESULT UI
+    // ================================
     let fitClass = "good";
     let fitEmoji = "✅";
     let fitText = "Good Match";
 
-    if (matchData.match_percentage < 50) {
+    if (percentage < 50) {
       fitClass = "bad";
       fitEmoji = "❌";
       fitText = "Low Match";
-    } else if (matchData.match_percentage < 75) {
+    } else if (percentage < 75) {
       fitClass = "warn";
       fitEmoji = "⚠️";
       fitText = "Partial Match";
@@ -154,22 +173,22 @@ matchBtn.addEventListener("click", async () => {
 
     matchResult.innerHTML = `
       <div class="card ${fitClass}">
-        <h4>${fitEmoji} ${fitText} – ${matchData.match_percentage}%</h4>
+        <h4>${fitEmoji} ${fitText} – ${percentage}%</h4>
       </div>
 
       <div class="card good">
         <p class="highlight">👍 Strengths</p>
-        <ul>${explainData.strengths.map(s => `<li>${s}</li>`).join("")}</ul>
+        <ul>${(explainData.strengths || []).map(s => `<li>${s}</li>`).join("")}</ul>
       </div>
 
       <div class="card warn">
         <p class="highlight">⚠️ Skill Gaps</p>
-        <ul>${explainData.gaps.map(g => `<li>${g}</li>`).join("")}</ul>
+        <ul>${(explainData.gaps || []).map(g => `<li>${g}</li>`).join("")}</ul>
       </div>
 
       <div class="card">
         <p class="highlight">🚀 Recommendation</p>
-        <p>${explainData.recommendation}</p>
+        <p>${explainData.recommendation || "No recommendation provided."}</p>
       </div>
     `;
 
