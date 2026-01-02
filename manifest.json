@@ -1,24 +1,32 @@
 {
   "manifest_version": 3,
   "name": "AI Job Analyzer",
-  "description": "Analyze job descriptions and match resumes using AI",
   "version": "1.0",
-  "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
-  },
-  "action": {
-    "default_popup": "popup.html"
-  },
-  "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["https://*/*"],
+  "description": "Analyze job descriptions and match resumes using AI",
+
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "https://jobai-production-cf74.up.railway.app/*"
+  ],
+
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"]
     }
-  ]
-}
+  ],
 
-  
+  "action": {
+    "default_popup": "popup.html"
+  },
+
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
