@@ -4,10 +4,11 @@
   "version": "1.0",
   "description": "Analyze job descriptions and match resumes using AI",
 
-  "permissions": [
-    "activeTab",
-    "scripting"
-  ],
+"permissions": [
+  "activeTab",
+  "tabs",
+  "scripting"
+],
 
   "host_permissions": [
     "https://jobai-production-cf74.up.railway.app/*"
