@@ -1,14 +1,17 @@
 {
   "manifest_version": 3,
   "name": "AI Job Analyzer",
-  "version": "1.0",
-  "description": "Analyze job descriptions and match resumes using AI",
+  "description": "Analyze job descriptions and match your resume before applying",
+  "version": "1.0.0",
 
-"permissions": [
-  "activeTab",
-  "tabs",
-  "scripting"
-],
+  "action": {
+    "default_popup": "popup.html"
+  },
+
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
 
   "host_permissions": [
     "https://jobai-production-cf74.up.railway.app/*"
@@ -20,10 +23,6 @@
       "js": ["content.js"]
     }
   ],
-
-  "action": {
-    "default_popup": "popup.html"
-  },
 
   "icons": {
     "16": "icon16.png",

@@ -1,17 +1,7 @@
-// ================================
-// CONFIG
-// ================================
-const API_BASE = "https://jobai-production-cf74.up.railway.app";
-
-// ================================
-// STATE
-// ================================
 let jobData = null;
 let resumeData = null;
 
-// ================================
-// UI ELEMENTS
-// ================================
+/* UI Elements */
 const analyzeBtn = document.getElementById("analyzeBtn");
 const matchBtn = document.getElementById("matchBtn");
 
@@ -28,61 +18,48 @@ const matchResult = document.getElementById("matchResult");
 const confidenceSection = document.getElementById("confidenceSection");
 const confidenceFill = document.getElementById("confidenceFill");
 
-// ================================
-// STEP 1: ANALYZE JOB
-// ================================
+const API_BASE = "https://jobai-production-cf74.up.railway.app";
+
+/* Utility */
+function resetAnalyzeBtn() {
+  analyzeBtn.textContent = "Analyze This Job";
+  analyzeBtn.disabled = false;
+}
+
+/* -----------------------------
+   STEP 1: ANALYZE JOB
+----------------------------- */
 analyzeBtn.addEventListener("click", async () => {
   analyzeBtn.textContent = "Analyzing...";
   analyzeBtn.disabled = true;
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-  chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TEXT" }, async (response) => {
-    if (!response?.pageText) {
-      alert("Unable to read job description.");
+  chrome.tabs.sendMessage(tab.id, { type: "ANALYZE_JOB" }, (response) => {
+    if (!response || !response.success) {
+      alert("Failed to analyze job. Please refresh the page and try again.");
       resetAnalyzeBtn();
       return;
     }
 
-    try {
-      const apiRes = await fetch(`${API_BASE}/analyze-job`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page_text: response.pageText })
-      });
+    jobData = response.data;
 
-      if (!apiRes.ok) throw new Error("API error");
+    homeScreen.style.display = "none";
+    resultScreen.style.display = "block";
 
-      jobData = await apiRes.json();
-
-      // UI Switch
-      homeScreen.style.display = "none";
-      resultScreen.style.display = "block";
-
-      // Populate Job Info
-      jobRole.textContent = jobData.role || "Unknown Role";
-      jobExperience.textContent = `Experience: ${jobData.experience || "N/A"}`;
-
-      jobSkills.innerHTML = (jobData.required_skills || [])
-        .map(skill => `<li>${skill}</li>`)
-        .join("");
-
-    } catch (err) {
-      alert("Failed to analyze job. Please try again.");
-    }
+    jobRole.textContent = jobData.role;
+    jobExperience.textContent = `Experience: ${jobData.experience}`;
+    jobSkills.innerHTML = jobData.required_skills
+      .map(skill => `<li>${skill}</li>`)
+      .join("");
 
     resetAnalyzeBtn();
   });
 });
 
-function resetAnalyzeBtn() {
-  analyzeBtn.textContent = "Analyze This Job";
-  analyzeBtn.disabled = false;
-}
-
-// ================================
-// STEP 2: MATCH RESUME
-// ================================
+/* -----------------------------
+   STEP 2: MATCH RESUME
+----------------------------- */
 matchBtn.addEventListener("click", async () => {
   matchResult.innerHTML = "<p>Matching resume...</p>";
 
@@ -98,7 +75,7 @@ matchBtn.addEventListener("click", async () => {
   }
 
   try {
-    // ---- Parse Resume ----
+    /* Upload Resume */
     const formData = new FormData();
     formData.append("file", file);
 
@@ -107,11 +84,9 @@ matchBtn.addEventListener("click", async () => {
       body: formData
     });
 
-    if (!resumeRes.ok) throw new Error("Resume parse failed");
-
     resumeData = await resumeRes.json();
 
-    // ---- Match Resume ↔ Job ----
+    /* Match */
     const matchRes = await fetch(`${API_BASE}/match`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -121,11 +96,9 @@ matchBtn.addEventListener("click", async () => {
       })
     });
 
-    if (!matchRes.ok) throw new Error("Match failed");
-
     const matchData = await matchRes.json();
 
-    // ---- Explain Match ----
+    /* Explain */
     const explainRes = await fetch(`${API_BASE}/explain`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -136,36 +109,28 @@ matchBtn.addEventListener("click", async () => {
       })
     });
 
-    if (!explainRes.ok) throw new Error("Explain failed");
-
     const explainData = await explainRes.json();
 
-    // ================================
-    // CONFIDENCE BAR
-    // ================================
-    const percentage = matchData.match_percentage || 0;
-
+    /* Confidence Bar */
     confidenceSection.style.display = "block";
     confidenceFill.style.width = "0%";
     confidenceFill.textContent = "0%";
 
     setTimeout(() => {
-      confidenceFill.style.width = `${percentage}%`;
-      confidenceFill.textContent = `${percentage}%`;
+      confidenceFill.style.width = `${matchData.match_percentage}%`;
+      confidenceFill.textContent = `${matchData.match_percentage}%`;
     }, 150);
 
-    // ================================
-    // RESULT UI
-    // ================================
+    /* Result UI */
     let fitClass = "good";
     let fitEmoji = "✅";
     let fitText = "Good Match";
 
-    if (percentage < 50) {
+    if (matchData.match_percentage < 50) {
       fitClass = "bad";
       fitEmoji = "❌";
       fitText = "Low Match";
-    } else if (percentage < 75) {
+    } else if (matchData.match_percentage < 75) {
       fitClass = "warn";
       fitEmoji = "⚠️";
       fitText = "Partial Match";
@@ -173,25 +138,24 @@ matchBtn.addEventListener("click", async () => {
 
     matchResult.innerHTML = `
       <div class="card ${fitClass}">
-        <h4>${fitEmoji} ${fitText} – ${percentage}%</h4>
+        <h4>${fitEmoji} ${fitText} – ${matchData.match_percentage}%</h4>
       </div>
 
       <div class="card good">
         <p class="highlight">👍 Strengths</p>
-        <ul>${(explainData.strengths || []).map(s => `<li>${s}</li>`).join("")}</ul>
+        <ul>${explainData.strengths.map(s => `<li>${s}</li>`).join("")}</ul>
       </div>
 
       <div class="card warn">
         <p class="highlight">⚠️ Skill Gaps</p>
-        <ul>${(explainData.gaps || []).map(g => `<li>${g}</li>`).join("")}</ul>
+        <ul>${explainData.gaps.map(g => `<li>${g}</li>`).join("")}</ul>
       </div>
 
       <div class="card">
         <p class="highlight">🚀 Recommendation</p>
-        <p>${explainData.recommendation || "No recommendation provided."}</p>
+        <p>${explainData.recommendation}</p>
       </div>
     `;
-
   } catch (err) {
     matchResult.innerHTML = "<p>Something went wrong. Please try again.</p>";
   }
