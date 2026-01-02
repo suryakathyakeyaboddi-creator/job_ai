@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Job Analyzer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="home">
+
+    <div class="container">
+  
+      <!-- HOME SCREEN -->
+      <div id="homeScreen">
+        <div class="header">
+          <h1>AI Job Analyzer</h1>
+          <p class="tagline">Know your chances before you apply</p>
+        </div>
+  
+        <div class="card">
+          <button id="analyzeBtn" class="primary-btn">
+            🔍 Analyze This Job
+          </button>
+          <p class="helper-text">
+            Works on LinkedIn, Naukri & most job portals
+          </p>
+        </div>
+      </div>
+  
+      <!-- RESULTS SCREEN -->
+      <div id="resultScreen" style="display:none;">
+  
+        <!-- Job Summary -->
+        <div class="card">
+          <h3 id="jobRole"></h3>
+          <p id="jobExperience"></p>
+  
+          <p><b>Required Skills</b></p>
+          <ul id="jobSkills"></ul>
+        </div>
+  
+        <!-- Resume Upload -->
+        <div class="card">
+          <h4>Upload Resume</h4>
+          <input type="file" id="resumeFile" accept=".pdf,.docx" />
+          <button id="matchBtn" class="primary-btn" style="margin-top:8px;">
+            Match Resume
+          </button>
+        </div>
+  
+        <!-- Confidence -->
+        <div id="confidenceSection" style="display:none;">
+          <p class="section-title">Match Confidence</p>
+          <div class="confidence-bar">
+            <div class="confidence-fill" id="confidenceFill">0%</div>
+          </div>
+        </div>
+  
+        <!-- Match Explanation -->
+        <div id="matchResult"></div>
+  
+      </div>
+  
+    </div>
+  
+    <script src="popup.js"></script>
+  </body>
+  
+</html>
